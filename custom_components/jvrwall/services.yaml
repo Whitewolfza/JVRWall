@@ -1,0 +1,34 @@
+set_meal:
+  fields:
+    day: {required: true, example: monday, selector: {select: {options: [monday, tuesday, wednesday, thursday, friday, saturday, sunday]}}}
+    meal: {required: true, example: Lasagna, selector: {text: null}}
+    slot: {default: dinner, selector: {select: {options: [breakfast, lunch, dinner]}}}
+add_shopping_item:
+  fields:
+    name: {required: true, selector: {text: null}}
+check_shopping_item:
+  fields:
+    id: {required: true, selector: {text: null}}
+    checked: {default: true, selector: {boolean: null}}
+remove_shopping_item:
+  fields:
+    id: {required: true, selector: {text: null}}
+clear_checked_shopping:
+add_chore:
+  fields:
+    title: {required: true, selector: {text: null}}
+    assignee: {selector: {text: null}}
+    due: {selector: {text: null}}
+update_chore:
+  fields:
+    id: {required: true, selector: {text: null}}
+    title: {selector: {text: null}}
+    assignee: {selector: {text: null}}
+    due: {selector: {text: null}}
+complete_chore:
+  fields:
+    id: {required: true, selector: {text: null}}
+    done: {default: true, selector: {boolean: null}}
+remove_chore:
+  fields:
+    id: {required: true, selector: {text: null}}

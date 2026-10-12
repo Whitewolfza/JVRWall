@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "JVRWall",
+        "description": "Choose the Google Calendar (or other calendar) entities to show and list your family members.",
+        "data": {"calendars": "Calendars", "members": "Family members"}
+      }
+    },
+    "abort": {"already_configured": "JVRWall is already configured"}
+  },
+  "options": {
+    "step": {
+      "init": {"data": {"calendars": "Calendars", "members": "Family members"}}
+    }
+  }
+}
