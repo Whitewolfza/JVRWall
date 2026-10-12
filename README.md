@@ -35,6 +35,13 @@ The integration also serves an installable companion web app (PWA) at `https://<
 
 **Import saved posts:** Facebook offers no API for saved posts (and scraping is against its terms). Instead, request *Download your information → Saved items and collections* as JSON, open the companion app → **Import saved posts**, choose the file, review the recipe-like items that were pre-selected, and add them all at once.
 
+### Mobile app (.NET MAUI – Android & iOS)
+`companion-maui/` contains a native MAUI app (`dotnet build companion-maui -f net8.0-android`; needs the `maui` workload).
+- **Android:** appears in Facebook's Share sheet as *JVR Recipes*; review and save.
+- **iOS:** use *Paste from clipboard* (Share → Copy link in Facebook); a real Share Extension needs a separate Xcode-signed target.
+- **Import saved posts:** pick the Facebook "Saved items and collections" JSON export; recipe-like items are pre-selected.
+- Settings: HTTPS Home Assistant URL + long-lived token (kept in SecureStorage).
+
 Requires HTTPS access to Home Assistant (needed for PWA install/share target).
 
 ## Development
