@@ -10,6 +10,7 @@ class JVRWallCard extends HTMLElement {
       meals: "sensor.jvrwall_meal_plan",
       shopping: "sensor.jvrwall_shopping_list",
       chores: "sensor.jvrwall_chores",
+      recipes: "sensor.jvrwall_recipes",
       calendars_sensor: "sensor.jvrwall_family_calendars",
       calendars: null,
       ...config,
@@ -22,7 +23,7 @@ class JVRWallCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
-    const key = ["meals","shopping","chores"].map((k) => {
+    const key = ["meals","shopping","chores","recipes"].map((k) => {
       const s = hass.states[this._config[k]]; return s ? s.last_updated : "";
     }).join("|");
     if (key !== this._key) { this._key = key; this._render(); }
@@ -79,6 +80,11 @@ class JVRWallCard extends HTMLElement {
       return `<div class="bar"><button data-act="addchore">＋ Add chore</button></div>` +
         chores.map((c) => `<div class="row"><button class="big ${c.done ? "on" : ""}" data-act="chorecheck" data-id="${c.id}" data-done="${c.done}">${c.done ? "✔" : "○"}</button><span class="${c.done ? "done" : ""}">${esc(c.title)}${c.assignee ? ` <em>· ${esc(c.assignee)}</em>` : ""}${c.due ? ` <small>due ${esc(c.due)}</small>` : ""}</span><button data-act="choredel" data-id="${c.id}">✕</button></div>`).join("");
     }
+    if (this._tab === "recipes") {
+      const recipes = this._attrs("recipes").recipes || [];
+      return `<div class="bar"><button data-act="addrecipe">＋ Add recipe</button></div>` +
+        recipes.map((r) => { const safe = /^https?:\/\//i.test(r.url || "") ? r.url : ""; return `<div class="row"><span>${safe ? `<a href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(r.name)}</a>` : esc(r.name)}${r.notes ? ` <small>${esc(r.notes)}</small>` : ""}</span><button data-act="recipedel" data-id="${r.id}">✕</button></div>`; }).join("");
+    }
     return this._events.length
       ? this._events.map((e) => `<div class="row"><strong>${esc(this._fmt(e))}</strong><span>${esc(e.summary)}</span></div>`).join("")
       : `<p>No upcoming events. Select calendars in the JVRWall integration options.</p>`;
@@ -86,7 +92,7 @@ class JVRWallCard extends HTMLElement {
 
   _render() {
     if (!this._hass || !this.shadowRoot) return;
-    const tabs = [["meals","🍽 Meals"],["shopping","🛒 Shopping"],["chores","✅ Chores"],["calendar","📅 Calendar"]];
+    const tabs = [["meals","🍽 Meals"],["shopping","🛒 Shopping"],["chores","✅ Chores"],["recipes","📖 Recipes"],["calendar","📅 Calendar"]];
     this.shadowRoot.innerHTML = `<style>
       :host{display:block}ha-card{padding:16px;font-size:1.3em}
       .tabs{display:flex;gap:8px;margin-bottom:16px}
@@ -109,6 +115,8 @@ class JVRWallCard extends HTMLElement {
       case "meal": { const m = prompt(`${cap(d.day)} ${d.slot}:`); if (m !== null) this._call("set_meal", { day: d.day, slot: d.slot, meal: m }); break; }
       case "addshop": { const n = prompt("Item:"); if (n) this._call("add_shopping_item", { name: n }); break; }
       case "shopcheck": this._call("check_shopping_item", { id: d.id, checked: d.checked !== "true" }); break;
+      case "addrecipe": { const n = prompt("Recipe name:"); if (n) { const u = prompt("Link (optional):"); this._call("add_recipe", { name: n, ...(u ? { url: u } : {}) }); } break; }
+      case "recipedel": this._call("remove_recipe", { id: d.id }); break;
       case "shopdel": this._call("remove_shopping_item", { id: d.id }); break;
       case "clearshop": this._call("clear_checked_shopping", {}); break;
       case "addchore": { const t = prompt("Chore:"); if (!t) break; const a = prompt("Assign to (optional):"); this._call("add_chore", a ? { title: t, assignee: a } : { title: t }); break; }

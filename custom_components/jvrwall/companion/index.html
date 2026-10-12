@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<title>JVRWall Recipe Share</title>
+<style>
+  body{font-family:sans-serif;max-width:480px;margin:0 auto;padding:16px}
+  input,textarea,button{width:100%;box-sizing:border-box;font-size:18px;padding:12px;margin:6px 0}
+  button{background:#03a9f4;color:#fff;border:0;border-radius:8px}
+  #status{margin-top:12px;font-weight:bold}
+  details{margin-top:24px}
+</style>
+</head>
+<body>
+<h2>📖 Save recipe to JVRWall</h2>
+<p>Share a Facebook post or link to this app, check the details, then save.</p>
+<form id="f">
+  <input id="name" placeholder="Recipe name">
+  <input id="url" placeholder="Link (https://…)" inputmode="url">
+  <textarea id="notes" rows="4" placeholder="Notes (shared post text)"></textarea>
+  <button type="submit">Save recipe</button>
+</form>
+<div id="status" role="status"></div>
+<details id="scan">
+  <summary>Import saved posts</summary>
+  <p>Facebook has no API for saved posts. Request <b>Download your information → Saved items and collections</b> (JSON), then pick the file here (or paste links, one per line). Recipe-like items are pre-selected.</p>
+  <input id="file" type="file" accept=".json,.txt,application/json,text/plain" multiple>
+  <textarea id="paste" rows="3" placeholder="…or paste links here"></textarea>
+  <button type="button" id="scanbtn">Scan</button>
+  <label><input type="checkbox" id="onlyr" checked style="width:auto"> Only recipe-like items</label>
+  <div id="found"></div>
+  <button type="button" id="addsel" hidden>Add selected to recipes</button>
+</details>
+<details id="settings">
+  <summary>Settings</summary>
+  <input id="ha" placeholder="Home Assistant URL, e.g. https://ha.example.com">
+  <input id="token" type="password" placeholder="Long-lived access token">
+  <button type="button" id="save">Save settings</button>
+</details>
+<script>
+const $ = (id) => document.getElementById(id);
+const status = (m) => { $("status").textContent = m; };
+const KEY = "jvrwall_companion";
+const cfg = () => JSON.parse(localStorage.getItem(KEY) || "{}");
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+
+// Default to this page's own origin (HA serves the app), so same-origin calls work.
+$("ha").value = cfg().ha || location.origin;
+$("token").value = cfg().token || "";
+if (!cfg().token) $("settings").open = true;
+$("save").onclick = () => {
+  localStorage.setItem(KEY, JSON.stringify({ ha: $("ha").value.trim().replace(/\/+$/, ""), token: $("token").value.trim() }));
+  status("Settings saved.");
+};
+
+// Prefill from the Web Share Target query (?title=&text=&url=).
+const q = new URLSearchParams(location.search);
+const title = q.get("title") || "", text = q.get("text") || "";
+let url = q.get("url") || "";
+const found = (text + " " + title).match(/https?:\/\/[^\s]+/);
+if (!url && found) url = found[0];
+const body = text.replace(/https?:\/\/[^\s]+/g, "").trim();
+const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
+$("url").value = url;
+$("name").value = (title && !/^https?:\/\//.test(title) ? title : lines[0] || "").slice(0, 120);
+$("notes").value = body.slice(0, 2000);
+
+$("f").onsubmit = async (e) => {
+  e.preventDefault();
+  const { ha, token } = cfg();
+  if (!ha || !token) { $("settings").open = true; return status("Set the Home Assistant URL and token first."); }
+  const payload = { name: $("name").value.trim(), source: "facebook-share" };
+  if ($("url").value.trim()) payload.url = $("url").value.trim();
+  if ($("notes").value.trim()) payload.notes = $("notes").value.trim();
+  try {
+    const r = await fetch(ha + "/api/services/jvrwall/add_recipe", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    status(r.ok ? "✔ Recipe saved!" : "Failed: " + r.status + " " + (await r.text()).slice(0, 200));
+  } catch (err) { status("Failed: " + err.message); }
+};
+
+// ---- Saved posts import ----
+const RECIPE_RE = /recipe|ingredient|cook|bake|baking|dinner|lunch|breakfast|dessert|casserole|soup|stew|salad|pasta|chicken|beef|cake|cookies?|bread|sauce|marinade|air ?fryer|slow ?cooker|oven|tbsp|tsp|cups?\b|resep|kos\b|braai|potjie/i;
+let items = [];
+function walk(node, out, ctx) {
+  if (Array.isArray(node)) return node.forEach((n) => walk(n, out, ctx));
+  if (!node || typeof node !== "object") return;
+  const c = { ...ctx };
+  for (const k of ["title", "name", "text", "description"]) if (typeof node[k] === "string" && node[k]) c.label = c.label && k !== "title" ? c.label : node[k];
+  const u = node.url || node.href || node.uri;
+  if (typeof u === "string" && /^https?:\/\//i.test(u)) out.push({ url: u, label: node.name || node.title || c.label || "", text: [node.name, node.title, node.text, node.description, c.label].filter(Boolean).join(" ") });
+  for (const v of Object.values(node)) walk(v, out, c);
+}
+function fixMojibake(s) { try { return decodeURIComponent(escape(s)); } catch { return s; } }
+$("scanbtn").onclick = async () => {
+  const out = [];
+  for (const f of $("file").files) {
+    const t = await f.text();
+    try { walk(JSON.parse(t), out, {}); } catch { (t.match(/https?:\/\/[^\s"]+/g) || []).forEach((u) => out.push({ url: u, label: "", text: "" })); }
+  }
+  ($("paste").value.match(/https?:\/\/[^\s"]+/g) || []).forEach((u) => out.push({ url: u, label: "", text: "" }));
+  const seen = new Set();
+  items = out.filter((i) => !seen.has(i.url) && seen.add(i.url)).map((i) => ({ ...i, label: fixMojibake(i.label), recipe: RECIPE_RE.test(fixMojibake(i.text) + " " + i.url) }));
+  renderFound();
+};
+$("onlyr").onchange = () => renderFound();
+function renderFound() {
+  const shown = items.filter((i) => !$("onlyr").checked || i.recipe);
+  const box = $("found"); box.textContent = "";
+  shown.forEach((i) => {
+    const l = document.createElement("label"); l.style.display = "block";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.style.width = "auto"; cb.checked = i.recipe; i.cb = cb;
+    l.append(cb, " " + (i.label || i.url).slice(0, 100));
+    box.append(l);
+  });
+  $("addsel").hidden = !shown.length;
+  status(shown.length ? shown.length + " item(s) found." : "Nothing found.");
+}
+$("addsel").onclick = async () => {
+  const { ha, token } = cfg();
+  if (!ha || !token) { $("settings").open = true; return status("Set the Home Assistant URL and token first."); }
+  let ok = 0, bad = 0;
+  for (const i of items.filter((x) => x.cb && x.cb.checked && x.cb.isConnected)) {
+    try {
+      const r = await fetch(ha + "/api/services/jvrwall/add_recipe", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: (i.label || "").slice(0, 120), url: i.url, source: "facebook-saved" }),
+      });
+      r.ok ? ok++ : bad++;
+    } catch { bad++; }
+  }
+  status("Added " + ok + " recipe(s)" + (bad ? ", " + bad + " failed" : "") + ".");
+};
+</script>
+</body>
+</html>

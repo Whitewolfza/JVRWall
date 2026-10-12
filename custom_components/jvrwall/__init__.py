@@ -14,6 +14,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CARD_URL,
+    COMPANION_URL,
     DAYS,
     DOMAIN,
     MEAL_SLOTS,
@@ -100,6 +101,23 @@ SERVICES = {
         ),
         lambda d, c: d.set_chore_done(c["id"], c["done"]),
     ),
+    "add_recipe": (
+        vol.Schema(
+            {
+                vol.Optional("name", default=""): cv.string,
+                vol.Optional("url"): cv.string,
+                vol.Optional("notes"): cv.string,
+                vol.Optional("source"): cv.string,
+            }
+        ),
+        lambda d, c: d.add_recipe(
+            c["name"], c.get("url"), c.get("notes"), c.get("source")
+        ),
+    ),
+    "remove_recipe": (
+        vol.Schema({vol.Required("id"): cv.string}),
+        lambda d, c: d.remove_recipe(c["id"]),
+    ),
     "remove_chore": (
         vol.Schema({vol.Required("id"): cv.string}),
         lambda d, c: d.remove_chore(c["id"]),
@@ -118,6 +136,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             [
                 StaticPathConfig(
                     CARD_URL,
+    COMPANION_URL,
                     str(Path(__file__).parent / "frontend" / "jvrwall-card.js"),
                     False,
                 )
@@ -126,6 +145,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         from homeassistant.components.frontend import add_extra_js_url
 
         add_extra_js_url(hass, CARD_URL)
+        await hass.http.async_register_static_paths(
+            [
+                StaticPathConfig(
+                    COMPANION_URL,
+                    str(Path(__file__).parent / "companion"),
+                    False,
+                )
+            ]
+        )
         hass.data[DOMAIN]["_frontend"] = True
 
     def _register(name, schema, action):

@@ -20,3 +20,4 @@ DAYS = [
 MEAL_SLOTS = ["breakfast", "lunch", "dinner"]
 
 CARD_URL = "/jvrwall/jvrwall-card.js"
+COMPANION_URL = "/jvrwall/companion"
