@@ -47,3 +47,16 @@ def test_chores_roundtrip():
     assert d2.chores[0]["done"] and d2.chores[0]["assignee"] == "Alex"
     d2.remove_chore(c["id"])
     assert d2.chores == []
+
+
+def test_recipes():
+    d = JVRWallData()
+    r = d.add_recipe("Pie", "https://facebook.com/x", "yum", "facebook-share")
+    assert d.as_dict()["recipes"][0]["url"] == "https://facebook.com/x"
+    assert d.add_recipe("", "https://a.b")["name"] == "https://a.b"
+    with pytest.raises(ValueError):
+        d.add_recipe("x", "javascript:alert(1)")
+    with pytest.raises(ValueError):
+        d.add_recipe("")
+    d.remove_recipe(r["id"])
+    assert len(d.recipes) == 1

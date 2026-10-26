@@ -1,0 +1,15 @@
+{
+  "name": "JVRWall Recipe Share",
+  "short_name": "JVR Recipes",
+  "start_url": "/jvrwall/companion/index.html",
+  "scope": "/jvrwall/companion/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#03a9f4",
+  "icons": [{"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}],
+  "share_target": {
+    "action": "/jvrwall/companion/index.html",
+    "method": "GET",
+    "params": {"title": "title", "text": "text", "url": "url"}
+  }
+}

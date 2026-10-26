@@ -63,6 +63,16 @@ class ChoresSensor(_Base):
         }
 
 
+class RecipesSensor(_Base):
+    @property
+    def native_value(self) -> int:
+        return len(self._manager.data.recipes)
+
+    @property
+    def extra_state_attributes(self):
+        return {"recipes": self._manager.data.recipes}
+
+
 class ConfigSensor(_Base):
     """Exposes configured calendars so the card can auto-discover them."""
 
@@ -84,6 +94,7 @@ async def async_setup_entry(
             MealPlanSensor(manager, entry, "meals", "Meal plan"),
             ShoppingSensor(manager, entry, "shopping", "Shopping list"),
             ChoresSensor(manager, entry, "chores", "Chores"),
+            RecipesSensor(manager, entry, "recipes", "Recipes"),
             ConfigSensor(manager, entry, "calendars", "Family calendars"),
         ]
     )

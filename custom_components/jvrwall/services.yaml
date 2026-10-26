@@ -32,3 +32,12 @@ complete_chore:
 remove_chore:
   fields:
     id: {required: true, selector: {text: null}}
+add_recipe:
+  fields:
+    name: {selector: {text: null}}
+    url: {selector: {text: null}}
+    notes: {selector: {text: null}}
+    source: {selector: {text: null}}
+remove_recipe:
+  fields:
+    id: {required: true, selector: {text: null}}

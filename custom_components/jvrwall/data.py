@@ -15,12 +15,14 @@ class JVRWallData:
         self.meals: dict[str, dict[str, str]] = data.get("meals", {})
         self.shopping: list[dict[str, Any]] = data.get("shopping", [])
         self.chores: list[dict[str, Any]] = data.get("chores", [])
+        self.recipes: list[dict[str, Any]] = data.get("recipes", [])
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "meals": self.meals,
             "shopping": self.shopping,
             "chores": self.chores,
+            "recipes": self.recipes,
         }
 
     # Meals
@@ -88,3 +90,32 @@ class JVRWallData:
 
     def remove_chore(self, chore_id: str) -> None:
         self.chores.remove(self._find(self.chores, chore_id))
+
+    # Recipes
+    def add_recipe(
+        self,
+        name: str,
+        url: str | None = None,
+        notes: str | None = None,
+        source: str | None = None,
+    ) -> dict[str, Any]:
+        name = (name or "").strip()
+        url = (url or "").strip() or None
+        if not name and url:
+            name = url
+        if not name:
+            raise ValueError("Recipe name or url is required")
+        if url and not url.lower().startswith(("http://", "https://")):
+            raise ValueError("Recipe url must start with http:// or https://")
+        recipe = {
+            "id": uuid4().hex,
+            "name": name,
+            "url": url,
+            "notes": (notes or "").strip() or None,
+            "source": source or None,
+        }
+        self.recipes.append(recipe)
+        return recipe
+
+    def remove_recipe(self, recipe_id: str) -> None:
+        self.recipes.remove(self._find(self.recipes, recipe_id))

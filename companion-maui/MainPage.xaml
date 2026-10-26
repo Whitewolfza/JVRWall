@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="JVRWall.Companion.MainPage" Title="JVR Recipes">
+  <ScrollView>
+    <VerticalStackLayout Padding="16" Spacing="10">
+      <Label Text="Share a Facebook post to this app, or paste a link." />
+      <Entry x:Name="NameEntry" Placeholder="Recipe name" />
+      <Entry x:Name="UrlEntry" Placeholder="Link (https://…)" Keyboard="Url" />
+      <Editor x:Name="NotesEditor" Placeholder="Notes" HeightRequest="100" />
+      <Button Text="Paste from clipboard" Clicked="OnPaste" />
+      <Button Text="Save recipe" Clicked="OnSave" />
+      <Label x:Name="StatusLabel" FontAttributes="Bold" />
+
+      <BoxView HeightRequest="1" Color="Gray" />
+      <Label Text="Import saved posts" FontSize="18" />
+      <Label Text="Request Facebook 'Download your information' → Saved items and collections (JSON), then pick the file. Recipe-like items are pre-selected." FontSize="12" />
+      <Button Text="Pick export file…" Clicked="OnPickFile" />
+      <CollectionView x:Name="Found" SelectionMode="Multiple" HeightRequest="300" SelectionChanged="OnSelectionChanged">
+        <CollectionView.ItemTemplate>
+          <DataTemplate>
+            <Label Text="{Binding Label}" Padding="6" LineBreakMode="TailTruncation" />
+          </DataTemplate>
+        </CollectionView.ItemTemplate>
+      </CollectionView>
+      <Button x:Name="AddSelected" Text="Add selected to recipes" Clicked="OnAddSelected" IsVisible="False" />
+
+      <BoxView HeightRequest="1" Color="Gray" />
+      <Label Text="Settings" FontSize="18" />
+      <Entry x:Name="HaUrlEntry" Placeholder="https://ha.example.com" Keyboard="Url" />
+      <Entry x:Name="TokenEntry" Placeholder="Long-lived access token" IsPassword="True" />
+      <Button Text="Save settings" Clicked="OnSaveSettings" />
+    </VerticalStackLayout>
+  </ScrollView>
+</ContentPage>
