@@ -19,12 +19,16 @@ add_chore:
     title: {required: true, selector: {text: null}}
     assignee: {selector: {text: null}}
     due: {selector: {text: null}}
+    reward_minutes: {default: 0, selector: {number: {min: 0, max: 1440, mode: box}}}
+    reward_points: {default: 0, selector: {number: {min: 0, max: 100000, mode: box}}}
 update_chore:
   fields:
     id: {required: true, selector: {text: null}}
     title: {selector: {text: null}}
     assignee: {selector: {text: null}}
     due: {selector: {text: null}}
+    reward_minutes: {selector: {number: {min: 0, max: 1440, mode: box}}}
+    reward_points: {selector: {number: {min: 0, max: 100000, mode: box}}}
 complete_chore:
   fields:
     id: {required: true, selector: {text: null}}
@@ -32,6 +36,11 @@ complete_chore:
 remove_chore:
   fields:
     id: {required: true, selector: {text: null}}
+redeem_reward:
+  fields:
+    member: {required: true, selector: {text: null}}
+    minutes: {default: 0, selector: {number: {min: 0, max: 1440, mode: box}}}
+    points: {default: 0, selector: {number: {min: 0, max: 100000, mode: box}}}
 add_recipe:
   fields:
     name: {selector: {text: null}}

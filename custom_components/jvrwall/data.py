@@ -1,6 +1,7 @@
 """Home Assistant independent data model for JVRWall."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -16,6 +17,11 @@ class JVRWallData:
         self.shopping: list[dict[str, Any]] = data.get("shopping", [])
         self.chores: list[dict[str, Any]] = data.get("chores", [])
         self.recipes: list[dict[str, Any]] = data.get("recipes", [])
+        self.balances: dict[str, dict[str, int]] = data.get("balances", {})
+        for chore in self.chores:  # migrate items stored before rewards existed
+            chore["reward_minutes"] = int(chore.get("reward_minutes") or 0)
+            chore["reward_points"] = int(chore.get("reward_points") or 0)
+            chore.setdefault("rewarded", False)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -23,6 +29,7 @@ class JVRWallData:
             "shopping": self.shopping,
             "chores": self.chores,
             "recipes": self.recipes,
+            "balances": self.balances,
         }
 
     # Meals
@@ -65,28 +72,85 @@ class JVRWallData:
 
     # Chores / todos
     def add_chore(
-        self, title: str, assignee: str | None = None, due: str | None = None
+        self,
+        title: str,
+        assignee: str | None = None,
+        due: str | None = None,
+        reward_minutes: int = 0,
+        reward_points: int = 0,
     ) -> dict[str, Any]:
         if not title.strip():
             raise ValueError("Title is required")
+        if reward_minutes < 0 or reward_points < 0:
+            raise ValueError("Rewards cannot be negative")
         chore = {
             "id": uuid4().hex,
             "title": title.strip(),
             "assignee": assignee or None,
             "due": due or None,
             "done": False,
+            "reward_minutes": int(reward_minutes),
+            "reward_points": int(reward_points),
+            "rewarded": False,
         }
         self.chores.append(chore)
         return chore
 
     def update_chore(self, chore_id: str, **fields: Any) -> None:
         chore = self._find(self.chores, chore_id)
+        for key in ("reward_minutes", "reward_points"):
+            if fields.get(key) is not None and fields[key] < 0:
+                raise ValueError("Rewards cannot be negative")
         for key in ("title", "assignee", "due"):
             if fields.get(key) is not None:
                 chore[key] = fields[key] or None
+        for key in ("reward_minutes", "reward_points"):
+            if fields.get(key) is not None:
+                chore[key] = int(fields[key])
 
-    def set_chore_done(self, chore_id: str, done: bool) -> None:
-        self._find(self.chores, chore_id)["done"] = done
+    # Balances
+    def balance(self, member: str) -> dict[str, int]:
+        return self.balances.setdefault(member, {"minutes": 0, "points": 0})
+
+    def _adjust(self, member: str, minutes: int, points: int) -> None:
+        bal = self.balance(member)
+        bal["minutes"] = max(0, bal["minutes"] + minutes)
+        bal["points"] = max(0, bal["points"] + points)
+
+    def set_chore_done(self, chore_id: str, done: bool) -> dict[str, Any] | None:
+        """Mark a chore done/undone. Returns an event payload when a reward is granted."""
+        chore = self._find(self.chores, chore_id)
+        chore["done"] = done
+        assignee = chore.get("assignee")
+        minutes = chore.get("reward_minutes", 0)
+        points = chore.get("reward_points", 0)
+        if done and not chore.get("rewarded"):
+            chore["rewarded"] = True
+            if assignee:
+                self._adjust(assignee, minutes, points)
+            return {
+                "chore_id": chore["id"],
+                "chore_name": chore["title"],
+                "assignee": assignee,
+                "reward_minutes": minutes if assignee else 0,
+                "reward_points": points if assignee else 0,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        if not done and chore.get("rewarded"):
+            chore["rewarded"] = False
+            if assignee:
+                self._adjust(assignee, -minutes, -points)
+        return None
+
+    def redeem(self, member: str, minutes: int = 0, points: int = 0) -> dict[str, int]:
+        if minutes < 0 or points < 0:
+            raise ValueError("Redeem amounts cannot be negative")
+        bal = self.balance(member)
+        if minutes > bal["minutes"] or points > bal["points"]:
+            raise ValueError("Insufficient balance")
+        bal["minutes"] -= minutes
+        bal["points"] -= points
+        return bal
 
     def remove_chore(self, chore_id: str) -> None:
         self.chores.remove(self._find(self.chores, chore_id))

@@ -59,8 +59,35 @@ class ChoresSensor(_Base):
     def extra_state_attributes(self):
         return {
             "chores": self._manager.data.chores,
+            "balances": self._manager.data.balances,
             "members": list(self._entry.options.get(CONF_MEMBERS, [])),
         }
+
+
+class BalanceSensor(_Base):
+    """Per-member Xbox minutes or points balance."""
+
+    _attr_state_class = "total"
+
+    def __init__(self, manager, entry, member: str, kind: str) -> None:
+        super().__init__(
+            manager,
+            entry,
+            f"{member}_{kind}",
+            f"{member} {'Xbox minutes' if kind == 'minutes' else 'points'}",
+        )
+        self._member = member
+        self._kind = kind
+        if kind == "minutes":
+            self._attr_native_unit_of_measurement = "min"
+
+    @property
+    def native_value(self) -> int:
+        return self._manager.data.balances.get(self._member, {}).get(self._kind, 0)
+
+    @property
+    def extra_state_attributes(self):
+        return {"member": self._member}
 
 
 class RecipesSensor(_Base):
@@ -89,8 +116,18 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     manager = hass.data[DOMAIN][entry.entry_id]
+    members = list(entry.options.get(CONF_MEMBERS, []))
+    for m in manager.data.balances:
+        if m not in members:
+            members.append(m)
+    balance_sensors = [
+        BalanceSensor(manager, entry, m, kind)
+        for m in members
+        for kind in ("minutes", "points")
+    ]
     async_add_entities(
-        [
+        balance_sensors
+        + [
             MealPlanSensor(manager, entry, "meals", "Meal plan"),
             ShoppingSensor(manager, entry, "shopping", "Shopping list"),
             ChoresSensor(manager, entry, "chores", "Chores"),

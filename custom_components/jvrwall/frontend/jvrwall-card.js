@@ -77,8 +77,10 @@ class JVRWallCard extends HTMLElement {
     }
     if (this._tab === "chores") {
       const chores = this._attrs("chores").chores || [];
-      return `<div class="bar"><button data-act="addchore">＋ Add chore</button></div>` +
-        chores.map((c) => `<div class="row"><button class="big ${c.done ? "on" : ""}" data-act="chorecheck" data-id="${c.id}" data-done="${c.done}">${c.done ? "✔" : "○"}</button><span class="${c.done ? "done" : ""}">${esc(c.title)}${c.assignee ? ` <em>· ${esc(c.assignee)}</em>` : ""}${c.due ? ` <small>due ${esc(c.due)}</small>` : ""}</span><button data-act="choredel" data-id="${c.id}">✕</button></div>`).join("");
+      const bals = this._attrs("chores").balances || {};
+      const balHtml = Object.keys(bals).map((m) => `<div class="row"><strong>${esc(m)}</strong><span>🎮 ${Number(bals[m].minutes) || 0} min · ⭐ ${Number(bals[m].points) || 0} pts</span><button data-act="redeem" data-member="${esc(m)}">Redeem</button></div>`).join("");
+      return `<div class="bar"><button data-act="addchore">＋ Add chore</button></div>` + balHtml +
+        chores.map((c) => `<div class="row"><button class="big ${c.done ? "on" : ""}" data-act="chorecheck" data-id="${c.id}" data-done="${c.done}">${c.done ? "✔" : "○"}</button><span class="${c.done ? "done" : ""}">${esc(c.title)}${c.assignee ? ` <em>· ${esc(c.assignee)}</em>` : ""}${c.due ? ` <small>due ${esc(c.due)}</small>` : ""}${(c.reward_minutes || c.reward_points) ? ` <small>🎮 ${Number(c.reward_minutes) || 0} min · ⭐ ${Number(c.reward_points) || 0} pts</small>` : ""}</span><button data-act="choredel" data-id="${c.id}">✕</button></div>`).join("");
     }
     if (this._tab === "recipes") {
       const recipes = this._attrs("recipes").recipes || [];
@@ -119,7 +121,8 @@ class JVRWallCard extends HTMLElement {
       case "recipedel": this._call("remove_recipe", { id: d.id }); break;
       case "shopdel": this._call("remove_shopping_item", { id: d.id }); break;
       case "clearshop": this._call("clear_checked_shopping", {}); break;
-      case "addchore": { const t = prompt("Chore:"); if (!t) break; const a = prompt("Assign to (optional):"); this._call("add_chore", a ? { title: t, assignee: a } : { title: t }); break; }
+      case "addchore": { const t = prompt("Chore:"); if (!t) break; const a = prompt("Assign to (optional):"); const m = a ? parseInt(prompt("Xbox minutes reward:", "0"), 10) || 0 : 0; const p = a ? parseInt(prompt("Points reward:", "0"), 10) || 0 : 0; this._call("add_chore", { title: t, ...(a ? { assignee: a, reward_minutes: Math.max(0, m), reward_points: Math.max(0, p) } : {}) }); break; }
+      case "redeem": { const m = parseInt(prompt(`Redeem Xbox minutes for ${d.member}:`, "0"), 10) || 0; const p = parseInt(prompt(`Redeem points for ${d.member}:`, "0"), 10) || 0; if (m > 0 || p > 0) this._call("redeem_reward", { member: d.member, minutes: m, points: p }); break; }
       case "chorecheck": this._call("complete_chore", { id: d.id, done: d.done !== "true" }); break;
       case "choredel": this._call("remove_chore", { id: d.id }); break;
     }

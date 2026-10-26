@@ -17,6 +17,7 @@ from .const import (
     COMPANION_URL,
     DAYS,
     DOMAIN,
+    EVENT_CHORE_COMPLETED,
     MEAL_SLOTS,
     SIGNAL_UPDATED,
     STORAGE_KEY,
@@ -78,9 +79,13 @@ SERVICES = {
                 vol.Required("title"): cv.string,
                 vol.Optional("assignee"): cv.string,
                 vol.Optional("due"): cv.string,
+                vol.Optional("reward_minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
+                vol.Optional("reward_points", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
             }
         ),
-        lambda d, c: d.add_chore(c["title"], c.get("assignee"), c.get("due")),
+        lambda d, c: d.add_chore(
+            c["title"], c.get("assignee"), c.get("due"), c["reward_minutes"], c["reward_points"]
+        ),
     ),
     "update_chore": (
         vol.Schema(
@@ -89,10 +94,17 @@ SERVICES = {
                 vol.Optional("title"): cv.string,
                 vol.Optional("assignee"): cv.string,
                 vol.Optional("due"): cv.string,
+                vol.Optional("reward_minutes"): vol.All(vol.Coerce(int), vol.Range(min=0)),
+                vol.Optional("reward_points"): vol.All(vol.Coerce(int), vol.Range(min=0)),
             }
         ),
         lambda d, c: d.update_chore(
-            c["id"], title=c.get("title"), assignee=c.get("assignee"), due=c.get("due")
+            c["id"],
+            title=c.get("title"),
+            assignee=c.get("assignee"),
+            due=c.get("due"),
+            reward_minutes=c.get("reward_minutes"),
+            reward_points=c.get("reward_points"),
         ),
     ),
     "complete_chore": (
@@ -100,6 +112,16 @@ SERVICES = {
             {vol.Required("id"): cv.string, vol.Optional("done", default=True): cv.boolean}
         ),
         lambda d, c: d.set_chore_done(c["id"], c["done"]),
+    ),
+    "redeem_reward": (
+        vol.Schema(
+            {
+                vol.Required("member"): cv.string,
+                vol.Optional("minutes", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
+                vol.Optional("points", default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            }
+        ),
+        lambda d, c: d.redeem(c["member"], c["minutes"], c["points"]),
     ),
     "add_recipe": (
         vol.Schema(
@@ -159,10 +181,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     def _register(name, schema, action):
         async def handler(call: ServiceCall) -> None:
             try:
-                action(manager.data, call.data)
+                result = action(manager.data, call.data)
             except (KeyError, ValueError) as err:
                 raise vol.Invalid(f"{name} failed: {err}") from err
             await manager.async_changed()
+            if name == "complete_chore" and result:
+                hass.bus.async_fire(EVENT_CHORE_COMPLETED, result)
 
         hass.services.async_register(DOMAIN, name, handler, schema=schema)
 
