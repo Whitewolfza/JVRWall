@@ -23,7 +23,7 @@ Data is stored locally in HA storage and exposed as sensors:
    ```
 
 ## Services (`jvrwall.*`)
-`set_meal`, `add_shopping_item`, `check_shopping_item`, `remove_shopping_item`, `clear_checked_shopping`, `add_chore`, `update_chore`, `complete_chore`, `remove_chore`. Item IDs are visible in the sensor attributes. See `services.yaml`.
+`set_meal`, `add_shopping_item`, `check_shopping_item`, `remove_shopping_item`, `clear_checked_shopping`, `add_chore`, `update_chore`, `complete_chore`, `redeem_reward`, `remove_chore`. Item IDs are visible in the sensor attributes. See `services.yaml`.
 
 ## Recipes & companion share app
 Recipes live in `sensor.jvrwall_recipes` (services `add_recipe`, `remove_recipe`) and in the card's **Recipes** tab.
@@ -46,3 +46,42 @@ Requires HTTPS access to Home Assistant (needed for PWA install/share target).
 
 ## Development
 `pip install pytest && pytest` runs the data-model tests (no Home Assistant needed).
+
+
+## Chore rewards
+
+Chores accept `assignee`, `reward_minutes` and `reward_points` (both default 0). Existing stored chores are migrated automatically with 0 rewards.
+
+```yaml
+service: jvrwall.add_chore
+data: {title: Do dishes, assignee: Sam, reward_minutes: 15, reward_points: 5}
+```
+
+### Balances
+Completing a chore (`jvrwall.complete_chore`) adds its rewards to the assignee's balance once (re-completing does nothing; un-completing reverts it). Balances are stored with the other JVRWall data and exposed as sensors per member (members configured in the integration options, plus anyone who has earned a reward): `sensor.jvrwall_<member>_xbox_minutes` and `sensor.jvrwall_<member>_points`. After granting time in the Xbox app, subtract it with `jvrwall.redeem_reward` (`member`, `minutes`, `points`) or the **Redeem** button on the card's Chores tab.
+
+### Event
+`jvrwall_chore_completed` is fired on completion with:
+`chore_id`, `chore_name`, `assignee`, `reward_minutes`, `reward_points`, `timestamp` (ISO 8601 UTC).
+
+### Example automation
+The Xbox Family app has no public API, so granting time is still a manual step; the notification just opens the app.
+
+```yaml
+alias: "Chore Completed: Grant Xbox Time"
+trigger:
+  - platform: event
+    event_type: jvrwall_chore_completed
+condition:
+  - condition: template
+    value_template: "{{ trigger.event.data.reward_minutes | int > 0 }}"
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "Chore Completed! 🎮"
+      message: "{{ trigger.event.data.assignee }} finished {{ trigger.event.data.chore_name }}. Add {{ trigger.event.data.reward_minutes }} min of Xbox time."
+      data:
+        url: "ms-xbox-family-settings://"            # iOS (unverified, please test)
+        clickAction: "app://com.microsoft.xboxfamilysettings"  # Android (verify package name)
+mode: parallel
+```

@@ -60,3 +60,20 @@ def test_recipes():
         d.add_recipe("")
     d.remove_recipe(r["id"])
     assert len(d.recipes) == 1
+
+
+def test_rewards_and_migration():
+    d = JVRWallData({"chores": [{"id": "x", "title": "Old", "assignee": "Sam", "due": None, "done": False}]})
+    assert d.chores[0]["reward_minutes"] == 0 and d.chores[0]["reward_points"] == 0
+    c = d.add_chore("Dishes", "Sam", None, 15, 5)
+    ev = d.set_chore_done(c["id"], True)
+    assert ev["assignee"] == "Sam" and ev["reward_minutes"] == 15 and ev["reward_points"] == 5
+    assert d.balances["Sam"] == {"minutes": 15, "points": 5}
+    assert d.set_chore_done(c["id"], True) is None  # no double reward
+    assert d.balances["Sam"] == {"minutes": 15, "points": 5}
+    d.redeem("Sam", 10, 2)
+    assert d.balances["Sam"] == {"minutes": 5, "points": 3}
+    with pytest.raises(ValueError):
+        d.redeem("Sam", 100, 0)
+    d.set_chore_done(c["id"], False)
+    assert d.balances["Sam"] == {"minutes": 0, "points": 0}
